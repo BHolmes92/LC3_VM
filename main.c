@@ -50,6 +50,26 @@ enum{
     FL_NEG = 1 << 2,
 };
 
+//Helper Functions
+//Extend a number and preserve sign
+uint16_t sign_extend(uint16_t number, int bit_count){
+    if((number >> (bit_count-1)) & 1){
+        number |= (0xFFFF << bit_count);
+    }
+    return number;
+}
+
+//Update the Condition register with OP Flag
+void update_flags(uint16_t r){
+    if(reg[r] == 0){
+        reg[R_COND] = FL_ZRO;
+    }else if(reg[r] >> 15){
+        reg[R_COND] = FL_NEG;
+    }else{
+        reg[R_COND] = FL_POS;
+    }
+}
+
 int main(int argc, const char* argv[]){
     reg[R_COND] = FL_ZRO;
 
