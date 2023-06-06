@@ -95,7 +95,20 @@ int main(int argc, const char* argv[]){
 
         switch(op){
             case OP_ADD:
-                break;
+                //Destination Register (3 bits 11:9)
+                uint16_t r0 = (instr >> 9) & 0x7;
+                //SR1 (3 bits 8:6)
+                uint16_t r1 = (instr >> 6) & 0x7;
+                //Check for imm mode (1 bit 5:5)
+                uint16_t imm5_flag = (instr >> 5) & 0x1;
+                if (imm5_flag){
+                    uint16_t imm5 = sign_extend(instr & 0x1F, 5);
+                    reg[r0] = reg[r1] + imm5;
+                }else{
+                    uint16_t r2 = (instr & 0x7); //SR2 3 bits 2:0
+                    reg[r0] = reg[r1] + reg[r2];
+                }
+                update_flags(r0);
             case OP_AND:
                 break;
             case OP_NOT:
