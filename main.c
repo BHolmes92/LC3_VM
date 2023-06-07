@@ -130,11 +130,28 @@ int main(int argc, const char* argv[]){
                 reg[r0] = ~reg[r1];
                 update_flags(r0);
             case OP_BR:
-                break;
+                //Check if Negative,Zero,Positive Flags set
+                uint16_t cond = (instr >> 9) & 0x7;
+                if(cond & reg[R_COND]){
+                    //Flag has been tested and matches register branch condition valid
+                    //Move Program Counter to the branch offset
+                    reg[R_PC] = reg[R_PC] + sign_extend(instr &0x1FF, 9);
+                }
             case OP_JMP:
-                break;
+                //Move to location 3 bits 8:6
+                uint16_t r1 = (instr >> 6) & 0x7;
+                reg[R_PC] = reg[r1];
             case OP_JSR:
-                break;
+                //Save Program Counter to R7
+                reg[R_R7] = reg[R_PC];
+                //Check if JSR or JSRR 1 bit 11:11
+                if (((instr >> 11) & 0x1) == 0){
+                    //JSRR Jump to base register
+                    reg[R_PC] = reg[(instr >> 6) & 0x7];
+                }else{
+                    //JSR Jump to offset
+                    reg[R_PC] = reg[R_PC] + sign_extend(instr & 0x7FF, 11);
+                }
             case OP_LD:
                 break;
             case OP_LDI:
