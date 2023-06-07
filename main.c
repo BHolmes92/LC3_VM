@@ -153,13 +153,31 @@ int main(int argc, const char* argv[]){
                     reg[R_PC] = reg[R_PC] + sign_extend(instr & 0x7FF, 11);
                 }
             case OP_LD:
-                break;
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t offset = sign_extend((instr & 0x1FF), 9);
+                //Get the memory contents at PC + offset and load into DR
+                reg[r0] = mem_read(reg[R_PC] + offset);
+                //Update Register flags
+                update_flags(r0);
             case OP_LDI:
-                break;
+                //Load the address pointed to in memory to DR
+                uint16_t r0 = (instr >> 9) &0x7;
+                uint16_t offset = sign_extend((instr & 0x1FF), 9);
+                //r0 is the memory address pointed to at the memory address specified by the PC + offset
+                reg[r0] = mem_read(mem_read(reg[R_PC] + offset));
+                update_flags(r0);
             case OP_LDR:
-                break;
+                uint16_t r0 = (instr >> 9) &0x7;
+                uint16_t baseR = (instr >> 6) & 0x07;
+                uint16_t offset = sign_extend(instr & 0x3f, 6);
+                //Return Memory at base register  + offset
+                reg[r0] = mem_read(reg[baseR] + offset);
+                update_flags(r0);
             case OP_LEA:
-                break;
+                uint16_t r0 = (instr >> 9) &0x7;
+                uint16_t offset = sign_extend((instr & 0x1FF), 9);
+                reg[r0] = reg[R_PC] + offset;
+                update_flags(r0); 
             case OP_ST:
                 break;
             case OP_STI:
