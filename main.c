@@ -50,6 +50,16 @@ enum{
     FL_NEG = 1 << 2,
 };
 
+//Trap Codes
+enum{
+    T_GETC =0,
+    T_OUT,
+    T_PUTS,
+    T_IN,
+    T_PUTSP,
+    T_HALT
+};
+
 //Helper Functions
 //Extend a number and preserve sign
 uint16_t sign_extend(uint16_t number, int bit_count){
@@ -179,13 +189,25 @@ int main(int argc, const char* argv[]){
                 reg[r0] = reg[R_PC] + offset;
                 update_flags(r0); 
             case OP_ST:
-                break;
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t offset = sign_extend((instr >> 0x1FF), 9);
+                mem_write(reg[R_PC] + offset, r0);
             case OP_STI:
-                break;
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t offset = sign_extend((instr & 0x1FF), 9);
+                mem_write(mem_read(reg[R_PC]+ offset), r0);
             case OP_STR:
-                break;
+                uint16_t r0 = (instr >> 9) &0x7;
+                uint16_t baseR = (instr >> 6) & 0x07;
+                uint16_t offset = sign_extend(instr & 0x3f, 6);
+                mem_write(reg[baseR] + offset, r0);
             case OP_TRAP:
-                break;
+                //Store current PC
+                reg[R_R7] = reg[R_PC];
+                //Based Run Trap Code
+                switch(instr & 0xFF){
+                
+                }
             case OP_RES:
             case OP_RTI:
             default:
