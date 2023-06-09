@@ -80,6 +80,35 @@ void update_flags(uint16_t r){
         reg[R_COND] = FL_POS;
     }
 }
+//Swap endianess
+uint16_t swap_endian(uint16_t x)
+{
+    //bit shift each byte and join together
+    return (x << 8) | (x >> 8);
+}
+
+//Read program in from file
+void read_program(FILE* file){
+    //origin is the memory address that points to the main program location
+    uint16_t origin;
+    //Read the file to memoery
+    fread(&origin, sizeof(origin), 1, file);
+    //LC3 programs are big endian flip order to little endian
+    origin = swap_endian(origin);
+
+    //load program into memory pointed to at origin
+    uint16_t max_read = MEMORY_MAX - origin;
+    uint16_t* p = memory + origin;
+    size_t read = fread(p, sizeof(uint16_t), max_read, file);
+
+    //Swap the endianess of the loaded program values
+    while(--read > 0){
+        *p = swap_endian(*p);
+        //move the pointer forward
+        ++p;
+    }
+
+}
 
 int main(int argc, const char* argv[]){
     reg[R_COND] = FL_ZRO;
@@ -231,7 +260,7 @@ int main(int argc, const char* argv[]){
 
                     case T_IN:
                         //Prompt for a character input
-                        printf("Please enter a character: "):
+                        printf("Please enter a character: ");
                         //Retrieve the character into R0
                         reg[R_R0] = (uint16_t) getc(stdin);
                         //Echo the character to output
@@ -244,7 +273,7 @@ int main(int argc, const char* argv[]){
                         //print out characters from memory each memory address has two characters print lower character first
                         uint16_t* character = memory + reg[R_R0];
                         while(*character){
-                            putc((*character & 0xFF, stdout));
+                            putc(*character & 0xFF, stdout);
                             char c2 = *character >> 8;
                             //Check if the second character exists if not 0x000 print
                             if(c2){
