@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdio.h>
 #define MEMORY_MAX (1 << 16)
 
 
@@ -206,6 +207,56 @@ int main(int argc, const char* argv[]){
                 reg[R_R7] = reg[R_PC];
                 //Based Run Trap Code
                 switch(instr & 0xFF){
+                    case T_GETC:
+                        //Get the next character from input and place in R0
+                        reg[R_R0] = (uint16_t) getc(stdin);
+                        //Set R_COND for new value
+                        update_flags(R_R0);
+                    case T_OUT:
+                        //Output a single character to console @ R07:0
+                        putc((char) reg[R_R0], stdout);
+                        fflush(stdout);
+                    case T_PUTS:
+                        //Output NULL terminated string to console
+                        //get character in R0
+                        uint16_t* character = memory + reg[R_R0];
+                        //While the address value is not 0x0000 output the character
+                        while(*character){
+                            putc((char)*character, stdout);
+                            //Increment character to the next memory address
+                            ++character;
+                        }
+                        //finished printing clear the buffer
+                        fflush(stdout);
+
+                    case T_IN:
+                        //Prompt for a character input
+                        printf("Please enter a character: "):
+                        //Retrieve the character into R0
+                        reg[R_R0] = (uint16_t) getc(stdin);
+                        //Echo the character to output
+                        putc((char) reg[R_R0], stdout);
+                        //Flush buffer
+                        fflush(stdout);
+                        //Set the Condition flags
+                        update_flags(R_R0);
+                    case T_PUTSP:
+                        //print out characters from memory each memory address has two characters print lower character first
+                        uint16_t* character = memory + reg[R_R0];
+                        while(*character){
+                            putc((*character & 0xFF, stdout));
+                            char c2 = *character >> 8;
+                            //Check if the second character exists if not 0x000 print
+                            if(c2){
+                                putc(c2, stdout);
+                            }
+                            //flush buffer
+                            fflush(stdout);
+                        } 
+                    case T_HALT:
+                        printf("Halting!!");
+                        fflush(stdout);
+                        running = 0;
                 
                 }
             case OP_RES:
