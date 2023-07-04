@@ -1,5 +1,12 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <signal.h>
+//Windows Includes
+#ifdef _WIN32
+#include <Windows.h>
+//#include <conio.h>
+#endif
+
 #define MEMORY_MAX (1 << 16)
 
 
@@ -61,6 +68,12 @@ enum{
     T_HALT
 };
 
+//Memory Mapp Keyboard Registers
+enum{
+    MR_KBSR = 0xFE00, //Keyboard Status, key press detected
+    MR_KBDR = 0xFE02  //Keyboard Data, which key is pressed
+};
+
 //Helper Functions
 //Extend a number and preserve sign
 uint16_t sign_extend(uint16_t number, int bit_count){
@@ -110,12 +123,79 @@ void read_program(FILE* file){
 
 }
 
+//Read program from location string, check to ensure file exists before opening
+int read_image(const char* image_path){
+    FILE* file = fopen(image_path, "rb");
+    if(!file){
+        return 0;
+    }
+    read_program(file);
+    fclose(file);
+    return 1;
+}
+
+//Keyboard input functions for character WINDOWS
+#ifdef _WIN32 
+//Input buffering functions for windows
+HANDLE hStdin = INVALID_HANDLE_VALUE;
+DWORD fdwMode, fdwOldMode;
+
+void disable_input_buffering(){
+    hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    GetConsoleMode(hStdin, &fdwOldMode);
+    fdwMode = fdwOldMode ^ ENABLE_ECHO_INPUT ^ ENABLE_LINE_INPUT;
+    SetConsoleMode(hStdin, fdwMode);
+    FlushConsoleInputBuffer(hStdin);
+}
+
+void restore_input_buffering(){
+    SetConsoleMode(hStdin, fdwOldMode);
+}
+
+uint16_t check_key(){
+    return WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0 && _kbhit();
+}
+#endif
+
+//Functions to interact with keyboard memory areas
+void mem_write(uint16_t address, uint16_t val){
+    memory[address] = val;
+}
+
+uint16_t mem_read(u_int16_t address){
+    if(address = MR_KBSR){
+        //Key press detected check which key was pressed
+        if(check_key()){
+            memory[MR_KBSR] = (1 << 15);
+            memory[MR_KBDR] = getchar();
+        }else{
+            memory[MR_KBSR] = 0;
+        }
+    }
+    return memory[address];
+}
+
+void handle_interupt(int signal){
+    restore_input_buffering();
+    printf("\n");
+    exit(-2);
+}
+
+
+
+
+
 int main(int argc, const char* argv[]){
     reg[R_COND] = FL_ZRO;
 
     enum{PC_START = 0x3000};
     reg[R_PC] = PC_START;
     int running = 1;
+
+    //Terminal Configuration
+    signal(SIGINT, handle_interupt);
+    disable_input_buffering();
+
 
     //Program load
     if(argc < 2){
@@ -295,4 +375,7 @@ int main(int argc, const char* argv[]){
 
         }
     }
+    //Restore terminal config during exit
+    restore_input_buffering();
+
 }
