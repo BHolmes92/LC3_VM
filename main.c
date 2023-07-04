@@ -153,7 +153,7 @@ void restore_input_buffering(){
 }
 
 uint16_t check_key(){
-    return WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0 && _kbhit();
+    return WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0;
 }
 #endif
 
@@ -214,7 +214,7 @@ int main(int argc, const char* argv[]){
         uint16_t op = instr >> 12;
 
         switch(op){
-            case OP_ADD:
+            case OP_ADD:{
                 //Destination Register (3 bits 11:9)
                 uint16_t r0 = (instr >> 9) & 0x7;
                 //SR1 (3 bits 8:6)
@@ -229,7 +229,10 @@ int main(int argc, const char* argv[]){
                     reg[r0] = reg[r1] + reg[r2];
                 }
                 update_flags(r0);
-            case OP_AND:
+                break;
+            }
+
+            case OP_AND:{
                 //Destination Register (3 bits 11:9)
                 uint16_t r0 = (instr >> 9) & 0x7;
                 //SR1 (3 bits 8:6)
@@ -244,12 +247,18 @@ int main(int argc, const char* argv[]){
                     reg[r0] = reg[r1] & reg[r2];
                 }
                 update_flags(r0);
-            case OP_NOT:
+                break;
+            }
+
+            case OP_NOT:{
                 uint16_t r0 = (instr >> 9) & 0x7;
                 uint16_t r1 = (instr >> 9) & 0x7;
                 reg[r0] = ~reg[r1];
                 update_flags(r0);
-            case OP_BR:
+                break;
+            }
+
+            case OP_BR:{
                 //Check if Negative,Zero,Positive Flags set
                 uint16_t cond = (instr >> 9) & 0x7;
                 if(cond & reg[R_COND]){
@@ -257,11 +266,17 @@ int main(int argc, const char* argv[]){
                     //Move Program Counter to the branch offset
                     reg[R_PC] = reg[R_PC] + sign_extend(instr &0x1FF, 9);
                 }
-            case OP_JMP:
+                break;
+            }
+
+            case OP_JMP:{
                 //Move to location 3 bits 8:6
                 uint16_t r1 = (instr >> 6) & 0x7;
                 reg[R_PC] = reg[r1];
-            case OP_JSR:
+                break;
+            }
+
+            case OP_JSR:{
                 //Save Program Counter to R7
                 reg[R_R7] = reg[R_PC];
                 //Check if JSR or JSRR 1 bit 11:11
@@ -272,60 +287,90 @@ int main(int argc, const char* argv[]){
                     //JSR Jump to offset
                     reg[R_PC] = reg[R_PC] + sign_extend(instr & 0x7FF, 11);
                 }
-            case OP_LD:
+                break;
+            }
+
+            case OP_LD:{
                 uint16_t r0 = (instr >> 9) & 0x7;
                 uint16_t offset = sign_extend((instr & 0x1FF), 9);
                 //Get the memory contents at PC + offset and load into DR
                 reg[r0] = mem_read(reg[R_PC] + offset);
                 //Update Register flags
                 update_flags(r0);
-            case OP_LDI:
+                break;
+            }
+
+            case OP_LDI:{
                 //Load the address pointed to in memory to DR
                 uint16_t r0 = (instr >> 9) &0x7;
                 uint16_t offset = sign_extend((instr & 0x1FF), 9);
                 //r0 is the memory address pointed to at the memory address specified by the PC + offset
                 reg[r0] = mem_read(mem_read(reg[R_PC] + offset));
                 update_flags(r0);
-            case OP_LDR:
+                break;
+            }
+
+            case OP_LDR:{
                 uint16_t r0 = (instr >> 9) &0x7;
                 uint16_t baseR = (instr >> 6) & 0x07;
                 uint16_t offset = sign_extend(instr & 0x3f, 6);
                 //Return Memory at base register  + offset
                 reg[r0] = mem_read(reg[baseR] + offset);
                 update_flags(r0);
-            case OP_LEA:
+                break;
+            }
+
+            case OP_LEA:{
                 uint16_t r0 = (instr >> 9) &0x7;
                 uint16_t offset = sign_extend((instr & 0x1FF), 9);
                 reg[r0] = reg[R_PC] + offset;
                 update_flags(r0); 
-            case OP_ST:
+                break;
+            }
+
+            case OP_ST:{
                 uint16_t r0 = (instr >> 9) & 0x7;
-                uint16_t offset = sign_extend((instr >> 0x1FF), 9);
+                uint16_t offset = sign_extend((instr & 0x1FF), 9);
                 mem_write(reg[R_PC] + offset, r0);
-            case OP_STI:
+                break;
+            }
+
+            case OP_STI:{
                 uint16_t r0 = (instr >> 9) & 0x7;
                 uint16_t offset = sign_extend((instr & 0x1FF), 9);
                 mem_write(mem_read(reg[R_PC]+ offset), r0);
-            case OP_STR:
+                break;
+            }
+
+            case OP_STR:{
                 uint16_t r0 = (instr >> 9) &0x7;
                 uint16_t baseR = (instr >> 6) & 0x07;
                 uint16_t offset = sign_extend(instr & 0x3f, 6);
                 mem_write(reg[baseR] + offset, r0);
-            case OP_TRAP:
+                break;
+            }
+
+            case OP_TRAP:{
                 //Store current PC
                 reg[R_R7] = reg[R_PC];
                 //Based Run Trap Code
                 switch(instr & 0xFF){
-                    case T_GETC:
+                    case T_GETC:{
                         //Get the next character from input and place in R0
                         reg[R_R0] = (uint16_t) getc(stdin);
                         //Set R_COND for new value
                         update_flags(R_R0);
-                    case T_OUT:
+                        break;
+                    }
+
+                    case T_OUT:{
                         //Output a single character to console @ R07:0
                         putc((char) reg[R_R0], stdout);
                         fflush(stdout);
-                    case T_PUTS:
+                        break;
+                    }
+
+                    case T_PUTS:{
                         //Output NULL terminated string to console
                         //get character in R0
                         uint16_t* character = memory + reg[R_R0];
@@ -337,8 +382,10 @@ int main(int argc, const char* argv[]){
                         }
                         //finished printing clear the buffer
                         fflush(stdout);
+                        break;
+                    }
 
-                    case T_IN:
+                    case T_IN:{
                         //Prompt for a character input
                         printf("Please enter a character: ");
                         //Retrieve the character into R0
@@ -349,7 +396,10 @@ int main(int argc, const char* argv[]){
                         fflush(stdout);
                         //Set the Condition flags
                         update_flags(R_R0);
-                    case T_PUTSP:
+                        break;
+                    }
+
+                    case T_PUTSP:{
                         //print out characters from memory each memory address has two characters print lower character first
                         uint16_t* character = memory + reg[R_R0];
                         while(*character){
@@ -362,16 +412,29 @@ int main(int argc, const char* argv[]){
                             //flush buffer
                             fflush(stdout);
                         } 
-                    case T_HALT:
+                        break;
+                    }
+
+                    case T_HALT:{
                         printf("Halting!!");
                         fflush(stdout);
                         running = 0;
-                
+                        break;
+                    }
                 }
-            case OP_RES:
-            case OP_RTI:
-            default:
+            }
+            case OP_RES:{
                 break;
+            }
+
+            case OP_RTI:{
+                break;
+            }
+
+            default:{
+                break;
+            }
+        
 
         }
     }
