@@ -363,15 +363,15 @@ int main(int argc, const char* argv[]){
                         reg[R_R0] = (uint16_t) getchar();
                         //Set R_COND for new value
                         update_flags(R_R0);
-                        break;
                     }
+                        break;
 
                     case T_OUT:{
                         //Output a single character to console @ R07:0
                         putc((char) reg[R_R0], stdout);
                         fflush(stdout);
-                        break;
                     }
+                        break;
 
                     case T_PUTS:{
                         //Output NULL terminated string to console
@@ -385,45 +385,44 @@ int main(int argc, const char* argv[]){
                         }
                         //finished printing clear the buffer
                         fflush(stdout);
-                        break;
                     }
+                        break;
 
                     case T_IN:{
                         //Prompt for a character input
                         printf("Please enter a character: ");
                         //Retrieve the character into R0
-                        reg[R_R0] = (uint16_t) getchar();
-                        //Echo the character to output
-                        putc((char) reg[R_R0], stdout);
-                        //Flush buffer
+                        char character = getchar();
+                        putc(character, stdout);
                         fflush(stdout);
-                        //Set the Condition flags
+                        reg[R_R0] = (uint16_t)character;
                         update_flags(R_R0);
-                        break;
                     }
+                        break;
 
-                    case T_PUTSP:{
+                    case T_PUTSP: {
                         //print out characters from memory each memory address has two characters print lower character first
                         uint16_t* character = memory + reg[R_R0];
-                        while(*character){
-                            putc(*character & 0xFF, stdout);
-                            char c2 = *character >> 8;
+                        while (*character) {
+                            putc((*character & 0xFF), stdout);
+                            char c2 = (*character) >> 8;
                             //Check if the second character exists if not 0x000 print
-                            if(c2){
+                            if (c2) {
                                 putc(c2, stdout);
+                                ++character;
                             }
                             //flush buffer
                             fflush(stdout);
-                        } 
-                        break;
+                        }
                     }
+                        break;
 
                     case T_HALT:{
                         printf("Halting!!");
                         fflush(stdout);
                         running = 0;
-                        break;
                     }
+                        break;
                 }
             }
             case OP_RES:{
