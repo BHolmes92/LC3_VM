@@ -2,16 +2,13 @@
 #include <stdio.h>
 #include <signal.h>
 //Windows Includes
-#ifdef _WIN32
 #include <Windows.h>
-//#include <conio.h>
-#endif
-
-#define MEMORY_MAX (1 << 16)
+#include <conio.h>
 
 
 
-uint16_t memory[MEMORY_MAX];
+//=============================================
+//Enum Declarations
 
 //Define the Register map
 enum{
@@ -28,9 +25,9 @@ enum{
     R_COUNT //Gives the size of registers
 };
 
-uint16_t reg[R_COUNT];
 
-//Createa OpCodes
+
+//Create OpCodes
 enum{
     OP_BR = 0, //BRANCH
     OP_ADD, //ADD
@@ -60,12 +57,12 @@ enum{
 
 //Trap Codes
 enum{
-    T_GETC =0,
-    T_OUT,
-    T_PUTS,
-    T_IN,
-    T_PUTSP,
-    T_HALT
+    T_GETC =0x20,
+    T_OUT =0x21,
+    T_PUTS = 0x22,
+    T_IN = 0x23,
+    T_PUTSP= 0x24,
+    T_HALT = 0x25
 };
 
 //Memory Mapp Keyboard Registers
@@ -73,8 +70,14 @@ enum{
     MR_KBSR = 0xFE00, //Keyboard Status, key press detected
     MR_KBDR = 0xFE02  //Keyboard Data, which key is pressed
 };
-
+//=============================================
+//VM Memory Defs
+#define MEMORY_MAX (1 << 16)
+uint16_t memory[MEMORY_MAX];
+uint16_t reg[R_COUNT];
+//=============================================================
 //Helper Functions
+
 //Extend a number and preserve sign
 uint16_t sign_extend(uint16_t number, int bit_count){
     if((number >> (bit_count-1)) & 1){
@@ -115,7 +118,7 @@ void read_program(FILE* file){
     size_t read = fread(p, sizeof(uint16_t), max_read, file);
 
     //Swap the endianess of the loaded program values
-    while(--read > 0){
+    while(read-- > 0){
         *p = swap_endian(*p);
         //move the pointer forward
         ++p;
@@ -127,6 +130,7 @@ void read_program(FILE* file){
 int read_image(const char* image_path){
     FILE* file = fopen(image_path, "rb");
     if(!file){
+        printf("No File Found");
         return 0;
     }
     read_program(file);
@@ -135,7 +139,7 @@ int read_image(const char* image_path){
 }
 
 //Keyboard input functions for character WINDOWS
-#ifdef _WIN32 
+
 //Input buffering functions for windows
 HANDLE hStdin = INVALID_HANDLE_VALUE;
 DWORD fdwMode, fdwOldMode;
@@ -153,17 +157,17 @@ void restore_input_buffering(){
 }
 
 uint16_t check_key(){
-    return WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0;
+    return WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0 && _kbhit();
 }
-#endif
+
 
 //Functions to interact with keyboard memory areas
 void mem_write(uint16_t address, uint16_t val){
     memory[address] = val;
 }
 
-uint16_t mem_read(u_int16_t address){
-    if(address = MR_KBSR){
+uint16_t mem_read(uint16_t address){
+    if(address == MR_KBSR){
         //Key press detected check which key was pressed
         if(check_key()){
             memory[MR_KBSR] = (1 << 15);
@@ -186,33 +190,32 @@ void handle_interupt(int signal){
 
 
 int main(int argc, const char* argv[]){
-    reg[R_COND] = FL_ZRO;
 
-    enum{PC_START = 0x3000};
-    reg[R_PC] = PC_START;
-    int running = 1;
+    //Program load
+    if (argc < 2) {
+        printf("[image-file1]\n");
+        exit(2);
+    }
+    for (int j = 1; j < argc; ++j) {
+        if (!read_image(argv[j])) {
+            printf("Failed to load image: %s\n", argv[j]);
+            exit(1);
+        }
+    }
 
     //Terminal Configuration
     signal(SIGINT, handle_interupt);
     disable_input_buffering();
 
+    reg[R_COND] = FL_ZRO;
 
-    //Program load
-    if(argc < 2){
-        printf("[image-file1]\n");
-        exit(2);
-    }
-    for(int j = 1; j < argc; ++j){
-        if(!read_image(argv[j])){
-            printf("Failed to load image: %s\n",argv[j]);
-            exit(1);
-        }
-    }
-
+    enum{PC_START = 0x3000};
+    reg[R_PC] = PC_START;
+    int running = 1;
+//==========================================================================
     while(running){
         uint16_t instr = mem_read(reg[R_PC]++);
         uint16_t op = instr >> 12;
-
         switch(op){
             case OP_ADD:{
                 //Destination Register (3 bits 11:9)
@@ -229,9 +232,9 @@ int main(int argc, const char* argv[]){
                     reg[r0] = reg[r1] + reg[r2];
                 }
                 update_flags(r0);
-                break;
+                
             }
-
+                break;
             case OP_AND:{
                 //Destination Register (3 bits 11:9)
                 uint16_t r0 = (instr >> 9) & 0x7;
@@ -247,16 +250,16 @@ int main(int argc, const char* argv[]){
                     reg[r0] = reg[r1] & reg[r2];
                 }
                 update_flags(r0);
-                break;
+                
             }
-
+                break;
             case OP_NOT:{
                 uint16_t r0 = (instr >> 9) & 0x7;
                 uint16_t r1 = (instr >> 9) & 0x7;
                 reg[r0] = ~reg[r1];
                 update_flags(r0);
-                break;
             }
+                break;
 
             case OP_BR:{
                 //Check if Negative,Zero,Positive Flags set
@@ -266,15 +269,15 @@ int main(int argc, const char* argv[]){
                     //Move Program Counter to the branch offset
                     reg[R_PC] = reg[R_PC] + sign_extend(instr &0x1FF, 9);
                 }
-                break;
             }
+                break;
 
             case OP_JMP:{
                 //Move to location 3 bits 8:6
                 uint16_t r1 = (instr >> 6) & 0x7;
                 reg[R_PC] = reg[r1];
-                break;
             }
+                break;
 
             case OP_JSR:{
                 //Save Program Counter to R7
@@ -287,8 +290,8 @@ int main(int argc, const char* argv[]){
                     //JSR Jump to offset
                     reg[R_PC] = reg[R_PC] + sign_extend(instr & 0x7FF, 11);
                 }
-                break;
             }
+                break;
 
             case OP_LD:{
                 uint16_t r0 = (instr >> 9) & 0x7;
@@ -297,8 +300,8 @@ int main(int argc, const char* argv[]){
                 reg[r0] = mem_read(reg[R_PC] + offset);
                 //Update Register flags
                 update_flags(r0);
-                break;
             }
+                break;
 
             case OP_LDI:{
                 //Load the address pointed to in memory to DR
@@ -307,48 +310,48 @@ int main(int argc, const char* argv[]){
                 //r0 is the memory address pointed to at the memory address specified by the PC + offset
                 reg[r0] = mem_read(mem_read(reg[R_PC] + offset));
                 update_flags(r0);
-                break;
             }
+                break;
 
             case OP_LDR:{
                 uint16_t r0 = (instr >> 9) &0x7;
                 uint16_t baseR = (instr >> 6) & 0x07;
-                uint16_t offset = sign_extend(instr & 0x3f, 6);
+                uint16_t offset = sign_extend(instr & 0x3F, 6);
                 //Return Memory at base register  + offset
                 reg[r0] = mem_read(reg[baseR] + offset);
                 update_flags(r0);
-                break;
             }
+                break;
 
             case OP_LEA:{
                 uint16_t r0 = (instr >> 9) &0x7;
                 uint16_t offset = sign_extend((instr & 0x1FF), 9);
                 reg[r0] = reg[R_PC] + offset;
                 update_flags(r0); 
-                break;
             }
+                break;
 
             case OP_ST:{
                 uint16_t r0 = (instr >> 9) & 0x7;
                 uint16_t offset = sign_extend((instr & 0x1FF), 9);
-                mem_write(reg[R_PC] + offset, r0);
-                break;
+                mem_write(reg[R_PC] + offset, reg[r0]);
             }
+                break;
 
             case OP_STI:{
                 uint16_t r0 = (instr >> 9) & 0x7;
                 uint16_t offset = sign_extend((instr & 0x1FF), 9);
-                mem_write(mem_read(reg[R_PC]+ offset), r0);
-                break;
+                mem_write(mem_read(reg[R_PC]+ offset), reg[r0]);
             }
+                break;
 
             case OP_STR:{
                 uint16_t r0 = (instr >> 9) &0x7;
                 uint16_t baseR = (instr >> 6) & 0x07;
-                uint16_t offset = sign_extend(instr & 0x3f, 6);
-                mem_write(reg[baseR] + offset, r0);
-                break;
+                uint16_t offset = sign_extend(instr & 0x3F, 6);
+                mem_write(reg[baseR] + offset, reg[r0]);
             }
+                break;
 
             case OP_TRAP:{
                 //Store current PC
@@ -357,7 +360,7 @@ int main(int argc, const char* argv[]){
                 switch(instr & 0xFF){
                     case T_GETC:{
                         //Get the next character from input and place in R0
-                        reg[R_R0] = (uint16_t) getc(stdin);
+                        reg[R_R0] = (uint16_t) getchar();
                         //Set R_COND for new value
                         update_flags(R_R0);
                         break;
@@ -389,7 +392,7 @@ int main(int argc, const char* argv[]){
                         //Prompt for a character input
                         printf("Please enter a character: ");
                         //Retrieve the character into R0
-                        reg[R_R0] = (uint16_t) getc(stdin);
+                        reg[R_R0] = (uint16_t) getchar();
                         //Echo the character to output
                         putc((char) reg[R_R0], stdout);
                         //Flush buffer
@@ -432,6 +435,7 @@ int main(int argc, const char* argv[]){
             }
 
             default:{
+                abort();
                 break;
             }
         
