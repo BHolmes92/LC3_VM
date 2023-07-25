@@ -2,3 +2,10 @@
 .vscode/settings.json
 .vscode/launch.json
 2048.obj
+*.exe
+*.json
+/lc3-win.c
+/lc3-win.obj
+/main.obj
+/rogue.obj
+/.vs
